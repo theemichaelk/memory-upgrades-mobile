@@ -1,4 +1,5 @@
-import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { getPageUrl, SITE_PAGES, type SitePage, type SitePageGroup } from '../constants/pages';
 
@@ -10,16 +11,28 @@ type PageMenuProps = {
 };
 
 const GROUP_LABELS: Record<SitePageGroup, string> = {
-  main: 'Main',
+  main: 'Main & Blog Pages',
   category: 'Categories'
 };
 
-const MENU_SECTIONS: { group: SitePageGroup; pages: SitePage[] }[] = [
-  { group: 'main', pages: SITE_PAGES.filter((page) => page.group === 'main') },
-  { group: 'category', pages: SITE_PAGES.filter((page) => page.group === 'category') }
-];
-
 export function PageMenu({ visible, currentUrl, onClose, onSelectPage }: PageMenuProps) {
+  const [query, setQuery] = useState('');
+
+  const menuSections = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    const filteredPages = SITE_PAGES.filter((page) => {
+      if (!normalizedQuery) {
+        return true;
+      }
+      return page.label.toLowerCase().includes(normalizedQuery) || page.path.toLowerCase().includes(normalizedQuery);
+    });
+
+    return [
+      { group: 'main' as SitePageGroup, pages: filteredPages.filter((page) => page.group === 'main') },
+      { group: 'category' as SitePageGroup, pages: filteredPages.filter((page) => page.group === 'category') }
+    ].filter((section) => section.pages.length > 0);
+  }, [query]);
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
@@ -30,9 +43,18 @@ export function PageMenu({ visible, currentUrl, onClose, onSelectPage }: PageMen
               <Text style={styles.closeText}>Close</Text>
             </Pressable>
           </View>
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search pages..."
+            placeholderTextColor="#94a3b8"
+            style={styles.search}
+            accessibilityLabel="Search pages"
+          />
           <FlatList
-            data={MENU_SECTIONS}
+            data={menuSections}
             keyExtractor={(section) => section.group}
+            ListEmptyComponent={<Text style={styles.empty}>No pages match your search.</Text>}
             renderItem={({ item: section }) => (
               <View style={styles.section}>
                 <Text style={styles.sectionLabel}>{GROUP_LABELS[section.group]}</Text>
@@ -47,6 +69,7 @@ export function PageMenu({ visible, currentUrl, onClose, onSelectPage }: PageMen
                       onPress={() => {
                         onSelectPage(pageUrl);
                         onClose();
+                        setQuery('');
                       }}
                       accessibilityRole="button"
                       accessibilityLabel={`Open ${page.label}`}
@@ -96,6 +119,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 15
   },
+  search: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: '#0f172a',
+    backgroundColor: '#f8fafc'
+  },
   section: {
     paddingHorizontal: 12,
     paddingTop: 12
@@ -124,5 +160,11 @@ const styles = StyleSheet.create({
   rowTextActive: {
     color: '#0f4c81',
     fontWeight: '600'
+  },
+  empty: {
+    textAlign: 'center',
+    color: '#64748b',
+    padding: 24,
+    fontSize: 14
   }
 });

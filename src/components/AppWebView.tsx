@@ -3,9 +3,9 @@ import { ActivityIndicator, Linking, StyleSheet, View } from 'react-native';
 import { WebView, WebViewNavigation } from 'react-native-webview';
 import type { ShouldStartLoadRequest } from 'react-native-webview/lib/WebViewTypes';
 
-import { BASE_URL, CAPTURE_PAGE_SCRIPT } from '../constants';
+import { WEBVIEW_BRIDGE_SCRIPT } from '../constants/webview';
 import type { CachedPage } from '../types';
-import { isExternalUrl, normalizeUrl } from '../utils/url';
+import { isBlockedNavigation, isExternalUrl, normalizeUrl } from '../utils/url';
 import { OfflineBanner } from './OfflineBanner';
 import { WebViewError } from './WebViewError';
 
@@ -28,6 +28,13 @@ type AppWebViewProps = {
 };
 
 type WebViewSource = { uri: string } | { html: string; baseUrl: string };
+
+function openExternalUrl(url: string) {
+  if (isBlockedNavigation(url)) {
+    return;
+  }
+  void Linking.openURL(url);
+}
 
 export const AppWebView = forwardRef<AppWebViewHandle, AppWebViewProps>(function AppWebView(
   {
@@ -63,7 +70,7 @@ export const AppWebView = forwardRef<AppWebViewHandle, AppWebViewProps>(function
     }
 
     if (cachedPage) {
-      return { html: cachedPage.html, baseUrl: BASE_URL };
+      return { html: cachedPage.html, baseUrl: cachedPage.url };
     }
 
     return { uri: currentUrl };
@@ -113,6 +120,7 @@ export const AppWebView = forwardRef<AppWebViewHandle, AppWebViewProps>(function
     setIsLoading(true);
     if (normalizeUrl(currentUrl) === normalizeUrl(homeUrl)) {
       reload();
+      webviewRef.current?.injectJavaScript('window.scrollTo(0, 0); true;');
       return;
     }
     onUrlChange(homeUrl);
@@ -145,6 +153,11 @@ export const AppWebView = forwardRef<AppWebViewHandle, AppWebViewProps>(function
           payload?: { url?: string; html?: string };
         };
 
+        if (message.type === 'open-external' && message.payload?.url) {
+          openExternalUrl(message.payload.url);
+          return;
+        }
+
         if (message.type !== 'page-html' || !message.payload?.html || !message.payload.url) {
           return;
         }
@@ -162,9 +175,25 @@ export const AppWebView = forwardRef<AppWebViewHandle, AppWebViewProps>(function
   );
 
   const handleShouldStartLoad = useCallback((request: ShouldStartLoadRequest) => {
-    if (isExternalUrl(request.url)) {
-      void Linking.openURL(request.url);
+    if (isBlockedNavigation(request.url)) {
       return false;
+    }
+
+    if (isExternalUrl(request.url)) {
+      openExternalUrl(request.url);
+      return false;
+    }
+
+    return true;
+  }, []);
+
+  const handleOpenWindow = useCallback((event: { nativeEvent: { targetUrl: string } }) => {
+    const targetUrl = event.nativeEvent.targetUrl;
+    if (targetUrl) {
+      if (isExternalUrl(targetUrl)) {
+        openExternalUrl(targetUrl);
+        return false;
+      }
     }
     return true;
   }, []);
@@ -194,7 +223,7 @@ export const AppWebView = forwardRef<AppWebViewHandle, AppWebViewProps>(function
       setHasError(false);
     }
     if (isConnected) {
-      webviewRef.current?.injectJavaScript(CAPTURE_PAGE_SCRIPT);
+      webviewRef.current?.injectJavaScript(WEBVIEW_BRIDGE_SCRIPT);
     }
   }, [isConnected, offlineUnavailable]);
 
@@ -205,6 +234,7 @@ export const AppWebView = forwardRef<AppWebViewHandle, AppWebViewProps>(function
         <WebViewError
           message="You are offline and this page is not available. Visit it while online first, or go back to a saved page."
           onRetry={reload}
+          onGoHome={goHome}
         />
       </View>
     );
@@ -214,7 +244,7 @@ export const AppWebView = forwardRef<AppWebViewHandle, AppWebViewProps>(function
     <View style={styles.container}>
       {!isConnected && <OfflineBanner usingCache={usingCache} />}
       {hasError && !usingCache ? (
-        <WebViewError message={errorMessage} onRetry={reload} />
+        <WebViewError message={errorMessage} onRetry={reload} onGoHome={goHome} />
       ) : (
         <>
           <WebView
@@ -224,11 +254,13 @@ export const AppWebView = forwardRef<AppWebViewHandle, AppWebViewProps>(function
             onMessage={handleMessage}
             onNavigationStateChange={handleNavigation}
             onShouldStartLoadWithRequest={handleShouldStartLoad}
+            onOpenWindow={handleOpenWindow}
             onError={handleError}
             onHttpError={handleHttpError}
             onLoadEnd={handleLoadEnd}
             onLoadStart={() => setIsLoading(true)}
-            injectedJavaScript={isConnected ? CAPTURE_PAGE_SCRIPT : undefined}
+            injectedJavaScript={isConnected ? WEBVIEW_BRIDGE_SCRIPT : undefined}
+            injectedJavaScriptBeforeContentLoaded={isConnected ? WEBVIEW_BRIDGE_SCRIPT : undefined}
             javaScriptEnabled
             cacheEnabled
             domStorageEnabled
@@ -236,7 +268,7 @@ export const AppWebView = forwardRef<AppWebViewHandle, AppWebViewProps>(function
             thirdPartyCookiesEnabled
             pullToRefreshEnabled={isConnected}
             allowsBackForwardNavigationGestures
-            setSupportMultipleWindows={false}
+            setSupportMultipleWindows
             originWhitelist={['https://*', 'http://*']}
             startInLoadingState
             style={styles.webview}

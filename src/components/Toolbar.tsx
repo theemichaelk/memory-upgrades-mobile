@@ -6,7 +6,7 @@ type ToolbarProps = {
   onMenu: () => void;
   onBack: () => void;
   onForward: () => void;
-  onReload: () => void;
+  onMore: () => void;
   onHome: () => void;
 };
 
@@ -16,7 +16,7 @@ export function Toolbar({
   onMenu,
   onBack,
   onForward,
-  onReload,
+  onMore,
   onHome
 }: ToolbarProps) {
   return (
@@ -47,14 +47,6 @@ export function Toolbar({
         <Text style={styles.buttonText}>Home</Text>
       </Pressable>
       <Pressable
-        style={styles.button}
-        onPress={onReload}
-        accessibilityRole="button"
-        accessibilityLabel="Reload page"
-      >
-        <Text style={styles.buttonText}>Reload</Text>
-      </Pressable>
-      <Pressable
         style={[styles.button, !canGoForward && styles.buttonDisabled]}
         onPress={onForward}
         disabled={!canGoForward}
@@ -62,6 +54,9 @@ export function Toolbar({
         accessibilityLabel="Go forward"
       >
         <Text style={styles.buttonText}>Next</Text>
+      </Pressable>
+      <Pressable style={styles.button} onPress={onMore} accessibilityRole="button" accessibilityLabel="More actions">
+        <Text style={styles.buttonText}>More</Text>
       </Pressable>
     </View>
   );

@@ -1,15 +1,17 @@
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Linking, Share, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
+import { ActionsMenu } from './src/components/ActionsMenu';
 import { AppWebView, AppWebViewHandle } from './src/components/AppWebView';
+import { LocationBar } from './src/components/LocationBar';
 import { PageMenu } from './src/components/PageMenu';
 import { Toolbar } from './src/components/Toolbar';
 import { useDeepLink } from './src/hooks/useDeepLink';
 import { useNetworkStatus } from './src/hooks/useNetworkStatus';
 import { usePageCache } from './src/hooks/usePageCache';
-import { getHomeUrl, normalizeUrl } from './src/utils/url';
+import { getHomeUrl, getReadablePath, normalizeUrl } from './src/utils/url';
 
 function AppShell() {
   const webviewRef = useRef<AppWebViewHandle>(null);
@@ -18,6 +20,7 @@ function AppShell() {
   const [canGoBack, setCanGoBack] = useState(false);
   const [canGoForward, setCanGoForward] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
+  const [actionsVisible, setActionsVisible] = useState(false);
   const [hasRestoredSession, setHasRestoredSession] = useState(false);
 
   const isConnected = useNetworkStatus();
@@ -41,6 +44,18 @@ function AppShell() {
     setCanGoForward(state.canGoForward);
   }, []);
 
+  const handleShare = useCallback(async () => {
+    await Share.share({
+      message: `Check out ${getReadablePath(currentUrl)} on Memory Upgrades: ${currentUrl}`,
+      url: currentUrl,
+      title: 'Memory Upgrades'
+    });
+  }, [currentUrl]);
+
+  const handleOpenInBrowser = useCallback(() => {
+    void Linking.openURL(currentUrl);
+  }, [currentUrl]);
+
   if (!isHydrated) {
     return (
       <SafeAreaView style={styles.container}>
@@ -60,9 +75,10 @@ function AppShell() {
         onMenu={() => setMenuVisible(true)}
         onBack={() => webviewRef.current?.goBack()}
         onForward={() => webviewRef.current?.goForward()}
-        onReload={() => webviewRef.current?.reload()}
+        onMore={() => setActionsVisible(true)}
         onHome={() => webviewRef.current?.goHome()}
       />
+      <LocationBar currentUrl={currentUrl} isConnected={isConnected} />
       <AppWebView
         ref={webviewRef}
         isConnected={isConnected}
@@ -78,6 +94,13 @@ function AppShell() {
         currentUrl={currentUrl}
         onClose={() => setMenuVisible(false)}
         onSelectPage={handleNavigate}
+      />
+      <ActionsMenu
+        visible={actionsVisible}
+        onClose={() => setActionsVisible(false)}
+        onShare={() => void handleShare()}
+        onOpenInBrowser={handleOpenInBrowser}
+        onReload={() => webviewRef.current?.reload()}
       />
       <StatusBar style="dark" />
     </SafeAreaView>
