@@ -42,9 +42,12 @@ export function usePageCache() {
     [cacheStore]
   );
 
+  const lastUrl = cacheStore?.lastUrl ?? getHomeUrl();
+
   return {
     cacheStore,
     isHydrated,
+    lastUrl,
     rememberPage,
     getPageForUrl
   };

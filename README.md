@@ -5,7 +5,10 @@ Official Expo/React Native app for [memoryupgrades.org](https://www.memoryupgrad
 ## Features
 
 - Native WebView shell for the Memory Upgrades website
-- Back, Home, Reload, and Forward controls
+- Browse menu for all main site pages and blog categories
+- Back, Home, Reload, Forward, and Menu controls
+- Session restore to your last visited page
+- Deep links and universal links for `memoryupgrades://` and `https://www.memoryupgrades.org`
 - Offline support with per-page HTML caching (up to 25 pages, 7-day TTL)
 - Pull-to-refresh on supported platforms
 - External links open in the device browser
@@ -22,6 +25,7 @@ Official Expo/React Native app for [memoryupgrades.org](https://www.memoryupgrad
 
 ```bash
 npm install
+npm run setup
 npm start
 ```
 
@@ -31,6 +35,7 @@ Useful checks:
 
 ```bash
 npm run typecheck
+npm run verify:pages
 npm run doctor
 ```
 
@@ -38,12 +43,16 @@ npm run doctor
 
 ```
 App.tsx                 # App shell and layout
+app.config.ts           # Expo config (env-driven EAS settings)
 src/
-  components/           # Toolbar, WebView, banners, error UI
-  hooks/                # Network status and page cache
-  utils/                # URL helpers and cache persistence
+  components/           # Toolbar, WebView, page menu, banners, error UI
+  constants/pages.ts    # All site pages for the browse menu
+  hooks/                # Network status, page cache, deep links
+  utils/                # URL helpers, cache persistence, deep links
   constants.ts
   types.ts
+scripts/
+  verify-site-pages.mjs # Checks every browse-menu page returns HTTP 200
 ```
 
 ## EAS Build Setup
@@ -55,13 +64,14 @@ npm install -g eas-cli
 eas login
 ```
 
-2. Link the project:
+2. Copy environment template and link the project:
 
 ```bash
+cp .env.example .env
 eas init
 ```
 
-This updates `app.json` with your Expo account owner and `extra.eas.projectId`.
+Set `EXPO_PUBLIC_EAS_PROJECT_ID` and `EXPO_PUBLIC_EXPO_OWNER` in `.env` after `eas init`.
 
 3. Replace placeholder submit values in `eas.json` before store submission:
    - iOS: `appleId`, `ascAppId`, `appleTeamId`

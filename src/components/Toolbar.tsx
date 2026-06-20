@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 type ToolbarProps = {
   canGoBack: boolean;
   canGoForward: boolean;
+  onMenu: () => void;
   onBack: () => void;
   onForward: () => void;
   onReload: () => void;
@@ -12,6 +13,7 @@ type ToolbarProps = {
 export function Toolbar({
   canGoBack,
   canGoForward,
+  onMenu,
   onBack,
   onForward,
   onReload,
@@ -19,6 +21,14 @@ export function Toolbar({
 }: ToolbarProps) {
   return (
     <View style={styles.toolbar}>
+      <Pressable
+        style={styles.button}
+        onPress={onMenu}
+        accessibilityRole="button"
+        accessibilityLabel="Open page menu"
+      >
+        <Text style={styles.buttonText}>Menu</Text>
+      </Pressable>
       <Pressable
         style={[styles.button, !canGoBack && styles.buttonDisabled]}
         onPress={onBack}
@@ -69,10 +79,10 @@ const styles = StyleSheet.create({
   },
   button: {
     backgroundColor: '#0f4c81',
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 6,
-    minWidth: 72,
+    minWidth: 58,
     alignItems: 'center'
   },
   buttonDisabled: {

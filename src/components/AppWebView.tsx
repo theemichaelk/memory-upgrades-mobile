@@ -14,6 +14,7 @@ export type AppWebViewHandle = {
   goForward: () => void;
   reload: () => void;
   goHome: () => void;
+  navigateTo: (url: string) => void;
 };
 
 type AppWebViewProps = {
@@ -44,27 +45,60 @@ export const AppWebView = forwardRef<AppWebViewHandle, AppWebViewProps>(function
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('Please check your connection and try again.');
+  const [reloadToken, setReloadToken] = useState(0);
+
+  const cachedPage = useMemo(() => {
+    if (isConnected) {
+      return null;
+    }
+    return getCachedPage(currentUrl);
+  }, [currentUrl, getCachedPage, isConnected]);
+
+  const usingCache = !isConnected && Boolean(cachedPage);
+  const offlineUnavailable = !isConnected && !cachedPage;
 
   const source = useMemo<WebViewSource>(() => {
     if (isConnected) {
       return { uri: currentUrl };
     }
 
-    const cached = getCachedPage(currentUrl) ?? getCachedPage(homeUrl);
-    if (cached) {
-      return { html: cached.html, baseUrl: BASE_URL };
+    if (cachedPage) {
+      return { html: cachedPage.html, baseUrl: BASE_URL };
     }
 
     return { uri: currentUrl };
-  }, [currentUrl, getCachedPage, homeUrl, isConnected]);
+  }, [cachedPage, currentUrl, isConnected]);
 
-  const usingCache = !isConnected && Boolean(getCachedPage(currentUrl) ?? getCachedPage(homeUrl));
+  const webviewKey = `${isConnected ? 'online' : 'offline'}-${normalizeUrl(currentUrl)}-${reloadToken}`;
+
+  const navigateTo = useCallback(
+    (url: string) => {
+      setHasError(false);
+      setIsLoading(true);
+      onUrlChange(normalizeUrl(url));
+    },
+    [onUrlChange]
+  );
 
   const reload = useCallback(() => {
+    if (!isConnected) {
+      if (cachedPage) {
+        setHasError(false);
+        setIsLoading(true);
+        setReloadToken((token) => token + 1);
+        return;
+      }
+
+      setHasError(true);
+      setErrorMessage('You are offline and this page is not saved. Connect to the internet to reload.');
+      setIsLoading(false);
+      return;
+    }
+
     setHasError(false);
     setIsLoading(true);
     webviewRef.current?.reload();
-  }, []);
+  }, [cachedPage, isConnected]);
 
   const goBack = useCallback(() => {
     webviewRef.current?.goBack();
@@ -78,13 +112,17 @@ export const AppWebView = forwardRef<AppWebViewHandle, AppWebViewProps>(function
     setHasError(false);
     setIsLoading(true);
     if (normalizeUrl(currentUrl) === normalizeUrl(homeUrl)) {
-      webviewRef.current?.reload();
+      reload();
       return;
     }
     onUrlChange(homeUrl);
-  }, [currentUrl, homeUrl, onUrlChange]);
+  }, [currentUrl, homeUrl, onUrlChange, reload]);
 
-  useImperativeHandle(ref, () => ({ goBack, goForward, reload, goHome }), [goBack, goForward, reload, goHome]);
+  useImperativeHandle(
+    ref,
+    () => ({ goBack, goForward, reload, goHome, navigateTo }),
+    [goBack, goForward, reload, goHome, navigateTo]
+  );
 
   const handleNavigation = useCallback(
     (state: WebViewNavigation) => {
@@ -132,10 +170,17 @@ export const AppWebView = forwardRef<AppWebViewHandle, AppWebViewProps>(function
   }, []);
 
   const handleError = useCallback(() => {
+    if (offlineUnavailable) {
+      setHasError(true);
+      setErrorMessage('You are offline and this page has not been saved yet. Try again when you are back online.');
+      setIsLoading(false);
+      return;
+    }
+
     setHasError(true);
     setErrorMessage('The page could not be loaded. Pull down to refresh or tap Reload.');
     setIsLoading(false);
-  }, []);
+  }, [offlineUnavailable]);
 
   const handleHttpError = useCallback((event: { nativeEvent: { statusCode: number } }) => {
     setHasError(true);
@@ -145,9 +190,25 @@ export const AppWebView = forwardRef<AppWebViewHandle, AppWebViewProps>(function
 
   const handleLoadEnd = useCallback(() => {
     setIsLoading(false);
-    setHasError(false);
-    webviewRef.current?.injectJavaScript(CAPTURE_PAGE_SCRIPT);
-  }, []);
+    if (!offlineUnavailable) {
+      setHasError(false);
+    }
+    if (isConnected) {
+      webviewRef.current?.injectJavaScript(CAPTURE_PAGE_SCRIPT);
+    }
+  }, [isConnected, offlineUnavailable]);
+
+  if (offlineUnavailable) {
+    return (
+      <View style={styles.container}>
+        <OfflineBanner usingCache={false} />
+        <WebViewError
+          message="You are offline and this page is not available. Visit it while online first, or go back to a saved page."
+          onRetry={reload}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -157,6 +218,7 @@ export const AppWebView = forwardRef<AppWebViewHandle, AppWebViewProps>(function
       ) : (
         <>
           <WebView
+            key={webviewKey}
             ref={webviewRef}
             source={source}
             onMessage={handleMessage}
@@ -166,13 +228,13 @@ export const AppWebView = forwardRef<AppWebViewHandle, AppWebViewProps>(function
             onHttpError={handleHttpError}
             onLoadEnd={handleLoadEnd}
             onLoadStart={() => setIsLoading(true)}
-            injectedJavaScript={CAPTURE_PAGE_SCRIPT}
+            injectedJavaScript={isConnected ? CAPTURE_PAGE_SCRIPT : undefined}
             javaScriptEnabled
             cacheEnabled
             domStorageEnabled
             sharedCookiesEnabled
             thirdPartyCookiesEnabled
-            pullToRefreshEnabled
+            pullToRefreshEnabled={isConnected}
             allowsBackForwardNavigationGestures
             setSupportMultipleWindows={false}
             originWhitelist={['https://*', 'http://*']}
