@@ -3,7 +3,9 @@ import { ActivityIndicator, Linking, StyleSheet, View } from 'react-native';
 import { WebView, WebViewNavigation } from 'react-native-webview';
 import type { ShouldStartLoadRequest } from 'react-native-webview/lib/WebViewTypes';
 
+import { APP_USER_AGENT } from '../constants/appChrome';
 import { WEBVIEW_BRIDGE_SCRIPT } from '../constants/webview';
+import { APP_COLORS } from '../constants/theme';
 import type { CachedPage } from '../types';
 import { isBlockedNavigation, isExternalUrl, normalizeUrl } from '../utils/url';
 import { OfflineBanner } from './OfflineBanner';
@@ -277,6 +279,7 @@ export const AppWebView = forwardRef<AppWebViewHandle, AppWebViewProps>(function
             onLoadStart={() => setIsLoading(true)}
             injectedJavaScript={isConnected ? WEBVIEW_BRIDGE_SCRIPT : undefined}
             injectedJavaScriptBeforeContentLoaded={isConnected ? WEBVIEW_BRIDGE_SCRIPT : undefined}
+            userAgent={APP_USER_AGENT}
             javaScriptEnabled
             cacheEnabled
             domStorageEnabled
@@ -291,7 +294,7 @@ export const AppWebView = forwardRef<AppWebViewHandle, AppWebViewProps>(function
           />
           {isLoading && (
             <View style={styles.loader}>
-              <ActivityIndicator size="large" color="#0f4c81" />
+              <ActivityIndicator size="large" color={APP_COLORS.primary} />
             </View>
           )}
         </>

@@ -1,4 +1,7 @@
+import { buildAppChromeScript } from './appChrome';
+
 export const WEBVIEW_BRIDGE_SCRIPT = `
+${buildAppChromeScript()}
 (function () {
   if (window.__memoryUpgradesBridgeInstalled) {
     return true;

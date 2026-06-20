@@ -1,17 +1,30 @@
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Share, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionsMenu } from './src/components/ActionsMenu';
+import { AppHeader } from './src/components/AppHeader';
 import { AppWebView, AppWebViewHandle } from './src/components/AppWebView';
-import { LocationBar } from './src/components/LocationBar';
+import { BottomNav, BottomNavTab } from './src/components/BottomNav';
 import { PageMenu } from './src/components/PageMenu';
-import { Toolbar } from './src/components/Toolbar';
+import { APP_ARTICLES_URL } from './src/constants';
+import { APP_COLORS } from './src/constants/theme';
 import { useDeepLink } from './src/hooks/useDeepLink';
 import { useNetworkStatus } from './src/hooks/useNetworkStatus';
 import { usePageCache } from './src/hooks/usePageCache';
 import { getHomeUrl, getReadablePath, normalizeUrl } from './src/utils/url';
+
+function resolveActiveTab(url: string, homeUrl: string): BottomNavTab {
+  const normalized = normalizeUrl(url);
+  if (normalized === normalizeUrl(homeUrl)) {
+    return 'home';
+  }
+  if (normalized.includes('/blog/')) {
+    return 'blog';
+  }
+  return 'home';
+}
 
 function AppShell() {
   const webviewRef = useRef<AppWebViewHandle>(null);
@@ -25,6 +38,8 @@ function AppShell() {
 
   const isConnected = useNetworkStatus();
   const { isHydrated, lastUrl, rememberPage, getPageForUrl } = usePageCache();
+
+  const activeTab = useMemo(() => resolveActiveTab(currentUrl, homeUrl), [currentUrl, homeUrl]);
 
   const handleNavigate = useCallback((url: string) => {
     setCurrentUrl(normalizeUrl(url));
@@ -60,34 +75,44 @@ function AppShell() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.bootLoader}>
-          <ActivityIndicator size="large" color="#0f4c81" />
+          <ActivityIndicator size="large" color={APP_COLORS.primary} />
+          <View style={styles.bootBadge}>
+            <ActivityIndicator size="small" color="#fff" />
+          </View>
         </View>
-        <StatusBar style="dark" />
+        <StatusBar style="light" />
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <Toolbar
+      <AppHeader
+        title="Memory Upgrades"
+        subtitle={getReadablePath(currentUrl)}
         canGoBack={canGoBack}
-        canGoForward={canGoForward}
-        onMenu={() => setMenuVisible(true)}
-        onBack={() => webviewRef.current?.goBack()}
-        onForward={() => webviewRef.current?.goForward()}
-        onMore={() => setActionsVisible(true)}
-        onHome={() => webviewRef.current?.goHome()}
-      />
-      <LocationBar currentUrl={currentUrl} isConnected={isConnected} />
-      <AppWebView
-        ref={webviewRef}
         isConnected={isConnected}
-        homeUrl={homeUrl}
-        currentUrl={currentUrl}
-        getCachedPage={getPageForUrl}
-        onPageCached={rememberPage}
-        onUrlChange={setCurrentUrl}
-        onNavigationStateChange={handleNavigationStateChange}
+        onBack={() => webviewRef.current?.goBack()}
+        onMenu={() => setMenuVisible(true)}
+      />
+      <View style={styles.content}>
+        <AppWebView
+          ref={webviewRef}
+          isConnected={isConnected}
+          homeUrl={homeUrl}
+          currentUrl={currentUrl}
+          getCachedPage={getPageForUrl}
+          onPageCached={rememberPage}
+          onUrlChange={setCurrentUrl}
+          onNavigationStateChange={handleNavigationStateChange}
+        />
+      </View>
+      <BottomNav
+        activeTab={menuVisible ? 'browse' : actionsVisible ? 'more' : activeTab}
+        onHome={() => handleNavigate(homeUrl)}
+        onBlog={() => handleNavigate(APP_ARTICLES_URL)}
+        onBrowse={() => setMenuVisible(true)}
+        onMore={() => setActionsVisible(true)}
       />
       <PageMenu
         visible={menuVisible}
@@ -102,7 +127,7 @@ function AppShell() {
         onOpenInBrowser={handleOpenInBrowser}
         onReload={() => webviewRef.current?.reload()}
       />
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
     </SafeAreaView>
   );
 }
@@ -110,12 +135,30 @@ function AppShell() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff'
+    backgroundColor: APP_COLORS.background
+  },
+  content: {
+    flex: 1,
+    backgroundColor: APP_COLORS.surface,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    overflow: 'hidden',
+    marginTop: -8
   },
   bootLoader: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
+    backgroundColor: APP_COLORS.primary
+  },
+  bootBadge: {
+    marginTop: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: APP_COLORS.primaryDark,
+    alignItems: 'center',
+    justifyContent: 'center'
   }
 });
 

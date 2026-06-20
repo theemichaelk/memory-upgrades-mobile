@@ -1,6 +1,7 @@
 import { createElement, forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
+import { APP_COLORS } from '../constants/theme';
 import type { CachedPage } from '../types';
 import { normalizeUrl } from '../utils/url';
 
@@ -118,7 +119,7 @@ export const AppWebView = forwardRef<AppWebViewHandle, AppWebViewProps>(function
       </View>
       {isLoading && (
         <View style={styles.loader}>
-          <ActivityIndicator size="large" color="#0f4c81" />
+          <ActivityIndicator size="large" color={APP_COLORS.primary} />
         </View>
       )}
     </View>

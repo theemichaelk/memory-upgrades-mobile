@@ -1,4 +1,4 @@
-import { ALLOWED_HOSTS, BASE_URL } from '../constants';
+import { ALLOWED_HOSTS, APP_HOME_URL, BASE_URL } from '../constants';
 import { findPageByUrl } from '../constants/pages';
 
 export function normalizeUrl(url: string): string {
@@ -61,7 +61,11 @@ export function isExternalUrl(url: string): boolean {
 }
 
 export function getHomeUrl(): string {
-  return normalizeUrl(process.env.EXPO_PUBLIC_BASE_URL ?? BASE_URL);
+  const fromEnv = process.env.EXPO_PUBLIC_BASE_URL;
+  if (fromEnv && fromEnv.includes('/blog')) {
+    return normalizeUrl(fromEnv);
+  }
+  return normalizeUrl(APP_HOME_URL);
 }
 
 export function getReadablePath(url: string): string {
