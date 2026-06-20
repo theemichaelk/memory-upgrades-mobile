@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, StyleSheet, View } from 'react-native';
 import { WebView, WebViewNavigation } from 'react-native-webview';
 import type { ShouldStartLoadRequest } from 'react-native-webview/lib/WebViewTypes';
@@ -217,7 +217,7 @@ export const AppWebView = forwardRef<AppWebViewHandle, AppWebViewProps>(function
     setIsLoading(false);
   }, []);
 
-  const handleLoadEnd = useCallback(() => {
+  const finishLoading = useCallback(() => {
     setIsLoading(false);
     if (!offlineUnavailable) {
       setHasError(false);
@@ -226,6 +226,21 @@ export const AppWebView = forwardRef<AppWebViewHandle, AppWebViewProps>(function
       webviewRef.current?.injectJavaScript(WEBVIEW_BRIDGE_SCRIPT);
     }
   }, [isConnected, offlineUnavailable]);
+
+  const handleLoadEnd = finishLoading;
+  const handleLoad = finishLoading;
+
+  useEffect(() => {
+    if (!isLoading) {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setIsLoading(false);
+    }, 20000);
+
+    return () => clearTimeout(timeout);
+  }, [currentUrl, isLoading, webviewKey]);
 
   if (offlineUnavailable) {
     return (
@@ -257,6 +272,7 @@ export const AppWebView = forwardRef<AppWebViewHandle, AppWebViewProps>(function
             onOpenWindow={handleOpenWindow}
             onError={handleError}
             onHttpError={handleHttpError}
+            onLoad={handleLoad}
             onLoadEnd={handleLoadEnd}
             onLoadStart={() => setIsLoading(true)}
             injectedJavaScript={isConnected ? WEBVIEW_BRIDGE_SCRIPT : undefined}
